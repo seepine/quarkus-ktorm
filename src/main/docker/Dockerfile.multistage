@@ -1,0 +1,19 @@
+## Stage 1 : build with maven builder image with native capabilities
+FROM quay.io/quarkus/ubi-quarkus-graalvmce-builder-image:22.3-java17 AS build
+USER root
+RUN microdnf install findutils
+COPY --chown=quarkus:quarkus gradlew /code/gradlew
+COPY --chown=quarkus:quarkus gradle /code/gradle
+COPY --chown=quarkus:quarkus build.gradle.kts /code/
+COPY --chown=quarkus:quarkus settings.gradle.kts /code/
+COPY --chown=quarkus:quarkus gradle.properties /code/
+COPY --chown=quarkus:quarkus src /code/src
+USER quarkus
+WORKDIR /code
+RUN ./gradlew build -Dquarkus.package.type=native -x test
+
+## Stage 2 : create the docker final image
+FROM quay.io/quarkus/quarkus-distroless-image:2.0
+COPY --from=build /code/build/*-runner /application
+CMD ["/application", "-Dquarkus.http.host=0.0.0.0"]
+
